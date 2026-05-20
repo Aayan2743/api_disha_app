@@ -1,0 +1,132 @@
+name: Client
+description: ''
+endpoints:
+  -
+    custom: []
+    httpMethods:
+      - GET
+    uri: api/client/client-list
+    metadata:
+      custom: []
+      groupName: Client
+      groupDescription: ''
+      subgroup: ''
+      subgroupDescription: ''
+      title: 'Client List'
+      description: 'Get all clients with search, filters and pagination.'
+      authenticated: true
+      deprecated: false
+    headers:
+      Authorization: 'Bearer {YOUR_TOKEN}'
+      Content-Type: application/json
+      Accept: application/json
+    urlParameters: []
+    cleanUrlParameters: []
+    queryParameters:
+      search:
+        custom: []
+        name: search
+        description: 'Search by client name or phone number.'
+        required: false
+        example: asif
+        type: string
+        enumValues: []
+        exampleWasSpecified: true
+        nullable: false
+        deprecated: false
+      lead_type:
+        custom: []
+        name: lead_type
+        description: 'Filter by lead type. Possible values: all,cold,warm,hot.'
+        required: false
+        example: hot
+        type: string
+        enumValues: []
+        exampleWasSpecified: true
+        nullable: false
+        deprecated: false
+      date_filter:
+        custom: []
+        name: date_filter
+        description: 'Filter by date. Possible values: today,yesterday,this_week,custom.'
+        required: false
+        example: today
+        type: string
+        enumValues: []
+        exampleWasSpecified: true
+        nullable: false
+        deprecated: false
+      from_date:
+        custom: []
+        name: from_date
+        description: 'date Required when date_filter=custom.'
+        required: false
+        example: '2026-05-01'
+        type: string
+        enumValues: []
+        exampleWasSpecified: true
+        nullable: false
+        deprecated: false
+      to_date:
+        custom: []
+        name: to_date
+        description: 'date Required when date_filter=custom.'
+        required: false
+        example: '2026-05-20'
+        type: string
+        enumValues: []
+        exampleWasSpecified: true
+        nullable: false
+        deprecated: false
+      page:
+        custom: []
+        name: page
+        description: 'Pagination page number.'
+        required: false
+        example: 1
+        type: integer
+        enumValues: []
+        exampleWasSpecified: true
+        nullable: false
+        deprecated: false
+      per_page:
+        custom: []
+        name: per_page
+        description: 'Number of records per page.'
+        required: false
+        example: 10
+        type: integer
+        enumValues: []
+        exampleWasSpecified: true
+        nullable: false
+        deprecated: false
+    cleanQueryParameters:
+      search: asif
+      lead_type: hot
+      date_filter: today
+      from_date: '2026-05-01'
+      to_date: '2026-05-20'
+      page: 1
+      per_page: 10
+    bodyParameters: []
+    cleanBodyParameters: []
+    fileParameters: []
+    responses:
+      -
+        custom: []
+        status: 200
+        content: |-
+          {
+           "status": true,
+           "message": "Client List Fetch Successfully"
+          }
+        headers: []
+        description: ''
+    responseFields: []
+    auth:
+      - headers
+      - Authorization
+      - 3V5EgbkvZcDPa166h8fd4ae
+    controller: null
+    method: null
+    route: null
