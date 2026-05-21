@@ -2,6 +2,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attendance;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -366,6 +367,469 @@ class AttendanceController extends Controller
 
             ],
 
+        ]);
+    }
+
+    public function punchIn(Request $request)
+    {
+        $today = date('Y-m-d');
+
+        $attendance = Attendance::where(
+            'user_id',
+            auth()->id()
+        )
+            ->whereDate(
+                'attendance_date',
+                $today
+            )
+            ->first();
+
+        // ALREADY PUNCHED IN
+        if ($attendance && $attendance->punch_in) {
+
+            return response()->json([
+
+                'status'  => false,
+
+                'message' => 'Already punched in today',
+            ]);
+        }
+
+        // CREATE
+        if (! $attendance) {
+
+            $attendance = Attendance::create([
+
+                'user_id'         => auth()->id(),
+
+                'attendance_date' => $today,
+            ]);
+        }
+
+        $attendance->update([
+
+            'punch_in'           => now(),
+
+            'punch_in_latitude'  => $request->latitude,
+
+            'punch_in_longitude' => $request->longitude,
+
+            'punch_in_address'   => $request->address,
+        ]);
+
+        return response()->json([
+
+            'status'  => true,
+
+            'message' => 'Punch in successful',
+
+            'data'    => [
+
+                'punch_in' => Carbon::parse(
+                    $attendance->punch_in
+                )->format('h:i:s A'),
+            ],
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PUNCH OUT
+    |--------------------------------------------------------------------------
+    */
+
+    public function punchOut(Request $request)
+    {
+        $today = date('Y-m-d');
+
+        $attendance = Attendance::where(
+            'user_id',
+            auth()->id()
+        )
+            ->whereDate(
+                'attendance_date',
+                $today
+            )
+            ->first();
+
+        if (! $attendance || ! $attendance->punch_in) {
+
+            return response()->json([
+
+                'status'  => false,
+
+                'message' => 'Please punch in first',
+            ]);
+        }
+
+        if ($attendance->punch_out) {
+
+            return response()->json([
+
+                'status'  => false,
+
+                'message' => 'Already punched out',
+            ]);
+        }
+
+        $punchIn = Carbon::parse(
+            $attendance->punch_in
+        );
+
+        $punchOut = now();
+
+        $minutes = $punchIn->diffInMinutes(
+            $punchOut
+        );
+
+        $attendance->update([
+
+            'punch_out'           => $punchOut,
+
+            'punch_out_latitude'  => $request->latitude,
+
+            'punch_out_longitude' => $request->longitude,
+
+            'punch_out_address'   => $request->address,
+
+            'total_minutes'       => $minutes,
+        ]);
+
+        return response()->json([
+
+            'status'  => true,
+
+            'message' => 'Punch out successful',
+
+            'data'    => [
+
+                'punch_out'     => Carbon::parse(
+                    $attendance->punch_out
+                )->format('h:i:s A'),
+
+                'total_minutes' => $minutes,
+            ],
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | TODAY SESSION
+    |--------------------------------------------------------------------------
+    */
+
+    public function todaySession()
+    {
+        $today = date('Y-m-d');
+
+        $attendance = Attendance::where(
+            'user_id',
+            auth()->id()
+        )
+            ->whereDate(
+                'attendance_date',
+                $today
+            )
+            ->first();
+
+        // NO ATTENDANCE
+        if (! $attendance) {
+
+            return response()->json([
+
+                'status'  => true,
+
+                'message' => 'No attendance found',
+
+                'data'    => [
+
+                    'status'       => 'OFF DUTY',
+
+                    'punch_in'     => null,
+
+                    'punch_out'    => null,
+
+                    'elapsed'      => null,
+
+                    'activity_log' => [],
+                ],
+            ]);
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | ELAPSED TIME
+    |--------------------------------------------------------------------------
+    */
+
+        $elapsed = null;
+
+        if ($attendance->punch_in) {
+
+            $start = Carbon::parse(
+                $attendance->punch_in
+            );
+
+            // IF PUNCHED OUT
+            if ($attendance->punch_out) {
+
+                $minutes = $attendance->total_minutes;
+
+            } else {
+
+                // LIVE RUNNING TIME
+                $minutes = $start->diffInMinutes(now());
+            }
+
+            $hrs = floor($minutes / 60);
+
+            $mins = $minutes % 60;
+
+            $elapsed = $hrs . 'h ' . $mins . 'm';
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | ACTIVITY LOG
+    |--------------------------------------------------------------------------
+    */
+
+        $activity = [];
+
+        // PUNCH IN
+        if ($attendance->punch_in) {
+
+            $activity[] = [
+
+                'type' => 'In',
+
+                'time' => Carbon::parse(
+                    $attendance->punch_in
+                )->format('H:i:s'),
+            ];
+        }
+
+        // PUNCH OUT
+        if ($attendance->punch_out) {
+
+            $activity[] = [
+
+                'type' => 'Out',
+
+                'time' => Carbon::parse(
+                    $attendance->punch_out
+                )->format('H:i:s'),
+            ];
+        }
+
+        return response()->json([
+
+            'status'  => true,
+
+            'message' => 'Session fetched successfully',
+
+            'data'    => [
+
+                'status'       => $attendance->punch_out
+                    ? 'OFF DUTY'
+                    : 'ON DUTY',
+
+                'punch_in'     => $attendance->punch_in
+                    ? Carbon::parse(
+                    $attendance->punch_in
+                )->format('H:i:s')
+                    : null,
+
+                'punch_out'    => $attendance->punch_out
+                    ? Carbon::parse(
+                    $attendance->punch_out
+                )->format('H:i:s')
+                    : null,
+
+                'elapsed'      => $elapsed,
+
+                'activity_log' => $activity,
+            ],
+        ]);
+    }
+
+    public function staffAttendance(Request $request)
+    {
+        // VALIDATION
+        $validator = validator($request->all(), [
+
+            'date' => 'nullable|date_format:Y-m-d',
+        ]);
+
+        if ($validator->fails()) {
+
+            return response()->json([
+
+                'status'  => false,
+
+                'message' => $validator->errors()->first(),
+
+            ], 422);
+        }
+
+        // DATE
+        $date = $request->filled('date')
+            ? $request->date
+            : date('Y-m-d');
+
+        // ALL STAFF
+        $users = User::whereIn('role', [
+
+            'admin',
+            'receptionist',
+            'telecaller',
+
+        ])->get();
+
+        // ATTENDANCE
+        $attendance = Attendance::whereDate(
+            'attendance_date',
+            $date
+        )
+            ->get()
+            ->keyBy('user_id');
+
+        $presentCount = 0;
+        $lateCount    = 0;
+        $absentCount  = 0;
+
+        $data = $users->map(function ($user) use (
+
+            $attendance,
+            &$presentCount,
+            &$lateCount,
+            &$absentCount
+
+        ) {
+
+            $att = $attendance[$user->id] ?? null;
+
+            // ABSENT
+            if (! $att) {
+
+                $absentCount++;
+
+                return [
+
+                    'user_id'     => $user->id,
+
+                    'name'        => $user->name,
+
+                    'phone'       => $user->phone,
+
+                    'role'        => ucfirst($user->role),
+
+                    'status'      => 'absent',
+
+                    'login_time'  => null,
+
+                    'logout_time' => null,
+
+                    'hours'       => null,
+                ];
+            }
+
+            $loginTime = $att->punch_in
+                ? Carbon::parse($att->punch_in)
+                : null;
+
+            $logoutTime = $att->punch_out
+                ? Carbon::parse($att->punch_out)
+                : null;
+
+            // PRESENT / LATE
+            if ($loginTime) {
+
+                if ($loginTime->format('H:i') > '10:00') {
+
+                    $lateCount++;
+
+                    $status = 'late';
+
+                } else {
+
+                    $presentCount++;
+
+                    $status = 'present';
+                }
+
+            } else {
+
+                $status = 'absent';
+
+                $absentCount++;
+            }
+
+            // TOTAL HOURS
+            $hours = null;
+
+            if ($loginTime) {
+
+                // IF PUNCHED OUT
+                if ($att->punch_out) {
+
+                    $minutes = $att->total_minutes;
+
+                } else {
+
+                    // LIVE RUNNING TIME
+                    $minutes = $loginTime->diffInMinutes(now());
+                }
+
+                $hrs = floor($minutes / 60);
+
+                $mins = $minutes % 60;
+
+                $hours = $hrs . 'h ' . $mins . 'm';
+            }
+
+            return [
+
+                'user_id'     => $user->id,
+
+                'name'        => $user->name,
+
+                'phone'       => $user->phone,
+
+                'role'        => ucfirst($user->role),
+
+                'status'      => $status,
+
+                'login_time'  => $loginTime
+                    ? $loginTime->format('H:i')
+                    : null,
+
+                'logout_time' => $logoutTime
+                    ? $logoutTime->format('H:i')
+                    : null,
+
+                'hours'       => $hours,
+            ];
+        });
+
+        return response()->json([
+
+            'status'  => true,
+
+            'message' => 'Attendance fetched successfully',
+
+            'counts'  => [
+
+                'present' => $presentCount,
+
+                'late'    => $lateCount,
+
+                'absent'  => $absentCount,
+            ],
+
+            'date'    => $date,
+
+            'data'    => $data,
         ]);
     }
 }

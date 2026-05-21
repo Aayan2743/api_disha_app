@@ -3,7 +3,6 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
 class staffcontroller extends Controller
@@ -33,7 +32,8 @@ class staffcontroller extends Controller
             'email'    => $request->email,
             'phone'    => $request->phone,
             'role'     => $request->role,
-            'password' => Hash::make($request->password),
+            // 'password' => Hash::make($request->password),
+            'password' => $request->password,
             'added_by' => auth()->user()->id, // Set the added_by field to the ID of the authenticated admin
         ]);
 
@@ -229,10 +229,11 @@ class staffcontroller extends Controller
 
         $validator = Validator::make($request->all(), [
 
-            'role'  => 'required',
-            'name'  => 'required',
-            'email' => 'required|email|unique:users,email,' . $id,
-            'phone' => 'required|digits:10|unique:users,phone,' . $id,
+            'role'     => 'required',
+            'name'     => 'required',
+            'email'    => 'required|email|unique:users,email,' . $id,
+            'phone'    => 'required|digits:10|unique:users,phone,' . $id,
+            'password' => 'nullable|min:6',
 
         ]);
 
@@ -244,7 +245,7 @@ class staffcontroller extends Controller
             ], 422);
         }
 
-        $staff->update([
+        $updateData = [
 
             'role'  => $request->role,
 
@@ -254,7 +255,16 @@ class staffcontroller extends Controller
 
             'phone' => $request->phone,
 
-        ]);
+        ];
+
+        // UPDATE PASSWORD ONLY IF SENT
+        if ($request->filled('password')) {
+
+            // $updateData['password'] = bcrypt($request->password);
+            $updateData['password'] = $request->password;
+        }
+
+        $staff->update($updateData);
 
         return response()->json([
 

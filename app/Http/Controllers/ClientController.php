@@ -532,4 +532,148 @@ class ClientController extends Controller
 
         ]);
     }
+
+    public function allClients(Request $request)
+    {
+        $query = Client::query();
+
+        // LEAD TYPE FILTER
+        if (
+            $request->filled('category') &&
+            $request->category != 'all'
+        ) {
+
+            $query->where(
+                'lead_type',
+                $request->category
+            );
+        }
+
+        // FROM DATE
+        if ($request->filled('from_date')) {
+
+            $query->whereDate(
+                'created_at',
+                '>=',
+                $request->from_date
+            );
+        }
+
+        // TO DATE
+        if ($request->filled('to_date')) {
+
+            $query->whereDate(
+                'created_at',
+                '<=',
+                $request->to_date
+            );
+        }
+
+        // SEARCH
+        if ($request->filled('search')) {
+
+            $search = $request->search;
+
+            $query->where(function ($q) use ($search) {
+
+                $q->where(
+                    'name',
+                    'LIKE',
+                    '%' . $search . '%'
+                )
+                    ->orWhere(
+                        'phone',
+                        'LIKE',
+                        '%' . $search . '%'
+                    )
+                    ->orWhere(
+                        'location',
+                        'LIKE',
+                        '%' . $search . '%'
+                    );
+            });
+        }
+
+        $clients = $query
+            ->with('addedBy')
+            ->latest()
+            ->paginate(20);
+
+        $data = collect($clients->items())->map(function ($item) {
+
+            return [
+
+                'id'        => $item->id,
+
+                'client_no' => $item->fullname,
+
+                'date'      => date(
+                    'Y-m-d',
+                    strtotime($item->created_at)
+                ),
+
+                'name'      => $item->name,
+
+                'phone'     => $item->phone,
+
+                'location'  => $item->location,
+
+                'category'  => $item->lead_type,
+
+                'notes'     => $item->remarks,
+                'case_type' => $item->case_type,
+
+                'added_by'  => $item->addedBy?->name ?? '-',
+            ];
+        });
+
+        // COUNTS
+        $totalCount = Client::count();
+
+        $hotCount = Client::where(
+            'lead_type',
+            'hot'
+        )->count();
+
+        $warmCount = Client::where(
+            'lead_type',
+            'warm'
+        )->count();
+
+        $coldCount = Client::where(
+            'lead_type',
+            'cold'
+        )->count();
+
+        return response()->json([
+
+            'status'     => true,
+
+            'message'    => 'Clients fetched successfully',
+
+            'counts'     => [
+
+                'total' => $totalCount,
+
+                'hot'   => $hotCount,
+
+                'warm'  => $warmCount,
+
+                'cold'  => $coldCount,
+            ],
+
+            'pagination' => [
+
+                'current_page' => $clients->currentPage(),
+
+                'last_page'    => $clients->lastPage(),
+
+                'per_page'     => $clients->perPage(),
+
+                'total'        => $clients->total(),
+            ],
+
+            'data'       => $data,
+        ]);
+    }
 }

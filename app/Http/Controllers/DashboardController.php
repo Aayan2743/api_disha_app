@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 use App\Models\Appointment;
 use App\Models\Client;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class DashboardController extends Controller
 {
@@ -251,6 +252,282 @@ class DashboardController extends Controller
 
             ],
 
+        ]);
+    }
+
+    /**
+     * Reception Dashboard
+     */
+
+    public function receptionDashboard()
+    {
+        $today = Carbon::today();
+
+        // TODAY APPOINTMENTS
+        $todayAppointments = Appointment::whereDate(
+            'appointment_date',
+            $today
+        )->get();
+
+        // TOTAL CLIENTS
+        $todayClients = $todayAppointments->count();
+
+        // TOTAL COLLECTED
+        $totalCollected = Appointment::whereDate(
+            'appointment_date',
+            $today
+        )
+            ->where('payment_status', 'completed')
+            ->sum('fee_amount');
+
+        // CASH COLLECTED
+        $cashCollected = Appointment::whereDate(
+            'appointment_date',
+            $today
+        )
+            ->where('payment_status', 'completed')
+            ->where('payment_collected_method', 'cash')
+            ->sum('fee_amount');
+
+        // UPI COLLECTED
+        $upiCollected = Appointment::whereDate(
+            'appointment_date',
+            $today
+        )
+            ->where('payment_status', 'completed')
+            ->where('payment_collected_method', 'upi')
+            ->sum('fee_amount');
+
+        // TODAY APPOINTMENTS STATUS
+        $reachedCount = $todayAppointments
+            ->where('status', 2)
+            ->count();
+
+        $paidCount = $todayAppointments
+            ->where('payment_status', 'completed')
+            ->count();
+
+        $pendingFeeCount = $todayAppointments
+            ->where('payment_status', 'pending')
+            ->count();
+
+        // RECENT WALKINS
+        $recentWalkins = Appointment::whereDate(
+            'appointment_date',
+            $today
+        )
+            ->latest()
+            ->take(6)
+            ->get()
+            ->map(function ($item) {
+
+                return [
+
+                    'id'             => $item->id,
+
+                    'client_name'    => $item->client_name,
+
+                    'client_phone'   => $item->client_phone,
+
+                    'location'       => $item->location,
+
+                    'fee_amount'     => $item->fee_amount,
+
+                    'payment_method' => $item->payment_collected_method,
+                ];
+            });
+
+        return response()->json([
+
+            'status'  => true,
+
+            'message' => 'Dashboard fetched successfully',
+
+            'data'    => [
+
+                'today_clients'      => $todayClients,
+
+                'total_collected'    => $totalCollected,
+
+                'cash_collected'     => $cashCollected,
+
+                'upi_collected'      => $upiCollected,
+
+                'today_appointments' => [
+
+                    'total'       => $todayClients,
+
+                    'reached'     => $reachedCount,
+
+                    'paid'        => $paidCount,
+
+                    'fee_pending' => $pendingFeeCount,
+                ],
+
+                'recent_walkins'     => $recentWalkins,
+            ],
+        ]);
+    }
+
+    public function adminDashboard()
+    {
+        $today = Carbon::today();
+
+        /*
+        |--------------------------------------------------------------------------
+        | TOTAL CLIENTS
+        |--------------------------------------------------------------------------
+        */
+
+        $totalClients = Client::count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | ACTIVE CLIENTS
+        |--------------------------------------------------------------------------
+        */
+
+        $activeCases = Client::where(
+            'status',
+            1
+        )->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | TOTAL COLLECTED
+        |--------------------------------------------------------------------------
+        */
+
+        $totalCollected = Appointment::where(
+            'payment_status',
+            'completed'
+        )
+            ->sum('fee_amount');
+
+        /*
+        |--------------------------------------------------------------------------
+        | TOTAL PENDING
+        |--------------------------------------------------------------------------
+        */
+
+        $totalPending = Appointment::where(
+            'payment_status',
+            'pending'
+        )
+            ->sum('fee_amount');
+
+        /*
+        |--------------------------------------------------------------------------
+        | TODAY LEADS
+        |--------------------------------------------------------------------------
+        */
+
+        $todayTotal = Client::whereDate(
+            'created_at',
+            $today
+        )->count();
+
+        $todayHot = Client::whereDate(
+            'created_at',
+            $today
+        )
+            ->where(
+                'lead_type',
+                'hot'
+            )
+            ->count();
+
+        $todayWarm = Client::whereDate(
+            'created_at',
+            $today
+        )
+            ->where(
+                'lead_type',
+                'warm'
+            )
+            ->count();
+
+        $todayCold = Client::whereDate(
+            'created_at',
+            $today
+        )
+            ->where(
+                'lead_type',
+                'cold'
+            )
+            ->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | TODAY COLLECTIONS
+        |--------------------------------------------------------------------------
+        */
+
+        $todayConsultFees = Appointment::whereDate(
+            'appointment_date',
+            $today
+        )
+            ->where(
+                'payment_status',
+                'completed'
+            )
+            ->sum('fee_amount');
+
+        /*
+        |--------------------------------------------------------------------------
+        | FOLLOWUPS
+        |--------------------------------------------------------------------------
+        */
+
+        $todayFollowups = Appointment::whereDate(
+            'appointment_date',
+            $today
+        )
+            ->where(
+                'status',
+                1
+            )
+            ->count();
+
+        return response()->json([
+
+            'status'  => true,
+
+            'message' => 'Admin dashboard fetched successfully',
+
+            'data'    => [
+
+                'total_clients'     => $totalClients,
+
+                'active_cases'      => $activeCases,
+
+                'collected_amount'  => $totalCollected,
+
+                'pending_dues'      => $totalPending,
+
+                'today_leads'       => [
+
+                    'total' => $todayTotal,
+
+                    'hot'   => $todayHot,
+
+                    'warm'  => $todayWarm,
+
+                    'cold'  => $todayCold,
+                ],
+
+                'today_collections' => [
+
+                    'consult_fees' => $todayConsultFees,
+                ],
+
+                'followups'         => [
+
+                    'today'         => $today->format('Y-m-d'),
+
+                    'pending_count' => $todayFollowups,
+                ],
+            ],
         ]);
     }
 

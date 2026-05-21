@@ -140,4 +140,51 @@ class AuthController extends Controller
         ], 200);
     }
 
+    /**
+     * Receptionist Login API
+     */
+
+    public function receptionistLogin(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'login'    => 'required',
+            'password' => 'required',
+        ]);
+
+        if ($validator->fails()) {
+
+            return response()->json([
+                'status'  => false,
+                'message' => $validator->errors()->first(),
+            ], 422);
+        }
+
+        // Check login type
+        $field = filter_var($request->login, FILTER_VALIDATE_EMAIL)
+            ? 'email'
+            : 'phone';
+
+        // Only Receptionist Login
+        $credentials = [
+            $field     => $request->login,
+            'password' => $request->password,
+            'role'     => 'receptionist', // Receptionist
+        ];
+
+        if (! $token = auth()->attempt($credentials)) {
+
+            return response()->json([
+                'status'  => false,
+                'message' => 'Invalid Receptionist Credentials',    
+            ], 401);
+        }
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Receptionist Login Successfully',
+            'token'   => $token,
+            'user'    => auth()->user(),
+        ], 200);
+    }
+
 }
