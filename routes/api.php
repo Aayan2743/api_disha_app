@@ -7,6 +7,7 @@ use App\Http\Controllers\ClientController;
 use App\Http\Controllers\CollectionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FollowupController;
+use App\Http\Controllers\LeadController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\staffcontroller;
 use Illuminate\Support\Facades\Route;
@@ -23,7 +24,7 @@ Route::post('/receptionist-login', [AuthController::class, 'receptionistLogin'])
 // Admin
 Route::group([
     'prefix'     => 'admin',
-    'middleware' => 'auth:api',
+    'middleware' => 'jwt.api',
 ], function () {
 
     Route::post('/add-staff', [StaffController::class, 'addStaff']);
@@ -37,6 +38,8 @@ Route::group([
     Route::delete('/delete-staff/{id}', [StaffController::class, 'deleteStaff']);
 
     Route::post('/toggle-status/{id}', [StaffController::class, 'toggleStatus']);
+
+    Route::get('/leads', [LeadController::class, 'allLeads']);
 
     Route::group([
         'prefix' => 'profile',
@@ -55,7 +58,7 @@ Route::group([
 
     'prefix'     => 'attendance',
 
-    'middleware' => 'auth:api',
+    'middleware' => 'jwt.api',
 
 ], function () {
 
@@ -90,7 +93,7 @@ Route::group([
 
     'prefix'     => 'client',
 
-    'middleware' => 'auth:api',
+    'middleware' => 'jwt.api',
 
 ], function () {
 
@@ -111,10 +114,11 @@ Route::group([
 
     'prefix'     => 'appointment',
 
-    'middleware' => 'auth:api',
+    'middleware' => 'jwt.api',
 
 ], function () {
 
+    Route::post('/add-appointment-mobile', [AppointmentController::class, 'addAppointment_using_clinet']);
     Route::post('/add-appointment', [AppointmentController::class, 'addAppointment']);
     Route::get('/appointment-list', [AppointmentController::class, 'appointmentList']);
 
@@ -141,7 +145,7 @@ Route::group([
 
     'prefix'     => 'dashboard',
 
-    'middleware' => 'auth:api',
+    'middleware' => 'jwt.api',
 
 ], function () {
 
@@ -168,7 +172,7 @@ Route::group([
 
     'prefix'     => 'followup',
 
-    'middleware' => 'auth:api',
+    'middleware' => 'jwt.api',
 
 ], function () {
 
@@ -188,7 +192,7 @@ Route::group([
 
     'prefix'     => 'collection',
 
-    'middleware' => 'auth:api',
+    'middleware' => 'jwt.api',
 
 ], function () {
 

@@ -267,6 +267,111 @@ class AppointmentController extends Controller
         ]);
     }
 
+    public function addAppointment_using_clinet(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+
+            'appointment_type' => 'required|in:online,offline',
+
+            'client_id'        => 'required|exists:clients,id',
+
+            'appointment_date' => 'required|date',
+
+            'appointment_time' => 'required',
+
+            'fee_amount'       => 'required|numeric',
+
+            'payment_method'   => 'required|in:cash,online_payment',
+
+            'remarks'          => 'nullable|string',
+
+        ]);
+
+        if ($validator->fails()) {
+
+            return response()->json([
+
+                'status'  => false,
+
+                'message' => $validator->errors()->first(),
+
+            ], 422);
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Check Appointment Already Exists
+    |--------------------------------------------------------------------------
+    */
+
+        $alreadyAppointment = Appointment::whereDate(
+            'appointment_date',
+            $request->appointment_date
+        )
+            ->where(
+                'appointment_time',
+                $request->appointment_time
+            )
+            ->first();
+
+        if ($alreadyAppointment) {
+
+            return response()->json([
+
+                'status'  => false,
+
+                'message' => 'Appointment Time Already Booked',
+
+            ], 422);
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Get Client Details
+    |--------------------------------------------------------------------------
+    */
+
+        $client = Client::find($request->client_id);
+
+        $appointment = Appointment::create([
+
+            'appointment_type' => $request->appointment_type,
+
+            'client_type'      => 'existing_client',
+
+            'client_id'        => $client->id,
+
+            'client_name'      => $client->fullname,
+
+            'client_phone'     => $client->phone,
+
+            'appointment_date' => $request->appointment_date,
+
+            'appointment_time' => $request->appointment_time,
+
+            'fee_amount'       => $request->fee_amount,
+
+            'payment_method'   => $request->payment_method,
+
+            'remarks'          => $request->remarks,
+
+            'added_by'         => auth()->id(),
+
+            'status'           => 1,
+
+        ]);
+
+        return response()->json([
+
+            'status'  => true,
+
+            'message' => 'Appointment Added Successfully',
+
+            'data'    => $appointment,
+
+        ]);
+    }
+
     public function fetchClient(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -765,15 +870,33 @@ class AppointmentController extends Controller
         $month = $request->month ?? date('m');
         $year  = $request->year ?? date('Y');
 
-        $appointments = Appointment::whereYear(
+        $query = Appointment::whereYear(
             'appointment_date',
             $year
         )
             ->whereMonth(
                 'appointment_date',
                 $month
-            )
-            ->get();
+            );
+
+        // STAFF ID FILTER (added_by)
+        if ($request->filled('staff_id')) {
+
+            $query->where('added_by', $request->staff_id);
+        }
+
+        // STAFF NAME FILTER (via addedBy relationship)
+        if ($request->filled('staff_name')) {
+
+            $staffName = $request->staff_name;
+
+            $query->whereHas('addedBy', function ($q) use ($staffName) {
+
+                $q->where('name', 'LIKE', '%' . $staffName . '%');
+            });
+        }
+
+        $appointments = $query->get();
 
         $grouped = $appointments
             ->groupBy('appointment_date')
@@ -860,6 +983,7 @@ class AppointmentController extends Controller
         }
 
         $appointments = $query
+            ->with('addedBy')
             ->orderBy('appointment_time', 'ASC')
             ->get();
 
@@ -909,6 +1033,8 @@ class AppointmentController extends Controller
                 $item->status == 2
                     ? 'closed'
                     : 'open',
+
+                'added_by'       => $item->addedBy?->name ?? '-',
             ];
         });
 
@@ -933,9 +1059,7 @@ class AppointmentController extends Controller
         ]);
     }
 
-
-
-     public function staffAttendance(Request $request)
+    public function staffAttendance(Request $request)
     {
         $date = $request->date
             ? Carbon::parse($request->date)->format('Y-m-d')
@@ -945,19 +1069,19 @@ class AppointmentController extends Controller
         $users = User::whereIn('role', [
             'admin',
             'receptionist',
-            'telecaller'
+            'telecaller',
         ])->get();
 
         $attendance = Attendance::whereDate(
-                'attendance_date',
-                $date
-            )
+            'attendance_date',
+            $date
+        )
             ->get()
             ->keyBy('user_id');
 
         $presentCount = 0;
-        $lateCount = 0;
-        $absentCount = 0;
+        $lateCount    = 0;
+        $absentCount  = 0;
 
         $data = $users->map(function ($user) use (
             $attendance,
@@ -969,27 +1093,27 @@ class AppointmentController extends Controller
             $att = $attendance[$user->id] ?? null;
 
             // ABSENT
-            if (!$att) {
+            if (! $att) {
 
                 $absentCount++;
 
                 return [
 
-                    'user_id' => $user->id,
+                    'user_id'     => $user->id,
 
-                    'name' => $user->name,
+                    'name'        => $user->name,
 
-                    'phone' => $user->phone,
+                    'phone'       => $user->phone,
 
-                    'role' => $user->role,
+                    'role'        => $user->role,
 
-                    'status' => 'absent',
+                    'status'      => 'absent',
 
-                    'login_time' => null,
+                    'login_time'  => null,
 
                     'logout_time' => null,
 
-                    'hours' => null,
+                    'hours'       => null,
                 ];
             }
 
@@ -1038,17 +1162,17 @@ class AppointmentController extends Controller
 
             return [
 
-                'user_id' => $user->id,
+                'user_id'     => $user->id,
 
-                'name' => $user->name,
+                'name'        => $user->name,
 
-                'phone' => $user->phone,
+                'phone'       => $user->phone,
 
-                'role' => ucfirst($user->role),
+                'role'        => ucfirst($user->role),
 
-                'status' => $status,
+                'status'      => $status,
 
-                'login_time' => $loginTime
+                'login_time'  => $loginTime
                     ? $loginTime->format('H:i')
                     : null,
 
@@ -1056,28 +1180,28 @@ class AppointmentController extends Controller
                     ? $logoutTime->format('H:i')
                     : null,
 
-                'hours' => $hours,
+                'hours'       => $hours,
             ];
         });
 
         return response()->json([
 
-            'status' => true,
+            'status'  => true,
 
             'message' => 'Attendance fetched successfully',
 
-            'counts' => [
+            'counts'  => [
 
                 'present' => $presentCount,
 
-                'late' => $lateCount,
+                'late'    => $lateCount,
 
-                'absent' => $absentCount,
+                'absent'  => $absentCount,
             ],
 
-            'date' => $date,
+            'date'    => $date,
 
-            'data' => $data,
+            'data'    => $data,
         ]);
     }
 }
