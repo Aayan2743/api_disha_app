@@ -32,6 +32,8 @@ class ClientController extends Controller
 
             'remarks'   => 'required|string',
 
+        ], [
+            'referance.required' => 'The reference field is required.',
         ]);
 
         if ($validator->fails()) {
@@ -40,7 +42,7 @@ class ClientController extends Controller
 
                 'status'  => false,
 
-                'message' => $validator->errors()->first(),
+                'message' => $validator->errors(),
 
             ], 422);
         }
@@ -577,7 +579,7 @@ class ClientController extends Controller
             $query->where(function ($q) use ($search) {
 
                 $q->where(
-                    'name',
+                    'fullname',
                     'LIKE',
                     '%' . $search . '%'
                 )
@@ -597,7 +599,7 @@ class ClientController extends Controller
         $clients = $query
             ->with('addedBy')
             ->latest()
-            ->paginate(20);
+            ->paginate(10);
 
         $data = collect($clients->items())->map(function ($item) {
 
@@ -606,6 +608,7 @@ class ClientController extends Controller
                 'id'        => $item->id,
 
                 'client_no' => $item->fullname,
+                'call_type' => $item->call_type,
 
                 'date'      => date(
                     'Y-m-d',
@@ -619,8 +622,9 @@ class ClientController extends Controller
                 'location'  => $item->location,
 
                 'category'  => $item->lead_type,
+                'notes'     => $item->lead_type,
 
-                'notes'     => $item->remarks,
+                'referance' => $item->referance,
                 'case_type' => $item->case_type,
 
                 'added_by'  => $item->addedBy?->name ?? '-',
@@ -674,6 +678,127 @@ class ClientController extends Controller
             ],
 
             'data'       => $data,
+        ]);
+    }
+
+    /**
+     * Update Client
+     *
+     * @group Client
+     *
+     * @authenticated
+     *
+     * @urlParam id integer required Client ID. Example: 1
+     */
+
+    public function updateClient(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+
+            'call_type' => 'required|in:incoming,outgoing',
+
+            'lead_type' => 'required|in:cold,hot,warm',
+
+            'fullname'  => 'required|string|max:255',
+
+            'phone'     => 'required|digits:10|unique:clients,phone,' . $id,
+
+            'location'  => 'required|string|max:255',
+
+            'referance' => 'required|string|max:255',
+
+            'case_type' => 'required|string|max:255',
+
+            'remarks'   => 'required|string',
+
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => false,
+                'message' => $validator->errors(),
+            ], 422);
+        }
+
+        $client = Client::find($id);
+
+        if (! $client) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Client not found',
+            ], 404);
+        }
+
+        $client->update([
+            'call_type' => $request->call_type,
+            'lead_type' => $request->lead_type,
+            'fullname'  => $request->fullname,
+            'phone'     => $request->phone,
+            'location'  => $request->location,
+            'referance' => $request->referance,
+            'case_type' => $request->case_type,
+            'remarks'   => $request->remarks,
+        ]);
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Client Updated Successfully',
+            'data'    => $client->fresh(),
+        ]);
+    }
+
+    public function deleteClient($id)
+    {
+        $client = Client::find($id);
+
+        if (! $client) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Client not found',
+            ], 404);
+        }
+
+        $client->delete();
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Client Deleted Successfully',
+        ]);
+    }
+
+    public function searchByPhone(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'phone' => 'required|digits:10',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => false,
+                'message' => $validator->errors()->first(),
+            ], 422);
+        }
+
+        $client = Client::where('phone', $request->phone)->first();
+
+        if (! $client) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Client not found',
+            ], 200);
+        }
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Client found',
+            'data'    => [
+                'id'        => $client->id,
+                'fullname'  => $client->fullname,
+                'phone'     => $client->phone,
+                'location'  => $client->location,
+                'case_type' => $client->case_type,
+                'lead_type' => $client->lead_type,
+            ],
         ]);
     }
 }

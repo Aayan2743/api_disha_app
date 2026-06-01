@@ -100,6 +100,9 @@ Route::group([
     Route::post('/add-client', [ClientController::class, 'addClient']);
     Route::get('/client-list', [ClientController::class, 'clientList']);
     Route::get('/client-details/{id}', [ClientController::class, 'showClient']);
+    Route::post('/update-client/{id}', [ClientController::class, 'updateClient']);
+    Route::delete('/delete-client/{id}', [ClientController::class, 'deleteClient']);
+    Route::get('/search-by-phone', [ClientController::class, 'searchByPhone']);
 
     Route::get(
         '/all-clients',
@@ -119,13 +122,19 @@ Route::group([
 ], function () {
 
     Route::post('/add-appointment-mobile', [AppointmentController::class, 'addAppointment_using_clinet']);
+    Route::post(
+        '/update-appointment/{id}',
+        [AppointmentController::class, 'updateAppointment_using_client']
+    );
     Route::post('/add-appointment', [AppointmentController::class, 'addAppointment']);
     Route::get('/appointment-list', [AppointmentController::class, 'appointmentList']);
+    Route::delete('/delete-appointment/{id}', [AppointmentController::class, 'deleteAppointment']);
 
     // using for receptionist to view appointments
     // Route::post('/store', [AppointmentController::class, 'store']);
     Route::post('/fetch-client', [AppointmentController::class, 'fetchClient']);
-    Route::post('/all-appointments', [AppointmentController::class, 'allAppointments']);
+    // Route::post('/all-appointments', [AppointmentController::class, 'allAppointments']);
+    Route::get('/all-appointments', [AppointmentController::class, 'allAppointments']);
     Route::post('/mark-reached/{id}', [AppointmentController::class, 'markReached']);
     Route::post('/fee-collected/{id}', [AppointmentController::class, 'feeCollected']);
 
@@ -184,6 +193,12 @@ Route::group([
     Route::get(
         '/followup-list',
         [FollowupController::class, 'followupList']
+    );
+
+    Route::get('/all-followups', [FollowupController::class, 'allFollowUps']);
+    Route::post(
+        '/update-followup/{id}',
+        [FollowupController::class, 'updateFollowup']
     );
 
 });

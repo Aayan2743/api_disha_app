@@ -267,6 +267,10 @@ class AppointmentController extends Controller
         ]);
     }
 
+    /**
+     * Add Appointment V1
+     */
+
     public function addAppointment_using_clinet(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -283,7 +287,7 @@ class AppointmentController extends Controller
 
             'payment_method'   => 'required|in:cash,online_payment',
 
-            'remarks'          => 'nullable|string',
+            'remarks'          => 'required|string',
 
         ]);
 
@@ -293,7 +297,7 @@ class AppointmentController extends Controller
 
                 'status'  => false,
 
-                'message' => $validator->errors()->first(),
+                'message' => $validator->errors(),
 
             ], 422);
         }
@@ -372,6 +376,103 @@ class AppointmentController extends Controller
         ]);
     }
 
+    /**
+     * Update Appointment (Using Client)
+     */
+
+    public function updateAppointment_using_client(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+
+            'appointment_type' => 'required|in:online,offline',
+            'appointment_date' => 'required|date',
+            'appointment_time' => 'required',
+            'fee_amount'       => 'required|numeric',
+            'payment_method'   => 'required|in:cash,online_payment',
+            'remarks'          => 'required|string',
+
+        ]);
+
+        if ($validator->fails()) {
+
+            return response()->json([
+                'status'  => false,
+                'message' => $validator->errors(),
+            ], 422);
+        }
+
+        $appointment = Appointment::find($id);
+
+        if (! $appointment) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Appointment not found',
+            ], 404);
+        }
+
+        // Check duplicate appointment time except current appointment
+        $alreadyAppointment = Appointment::whereDate(
+            'appointment_date',
+            $request->appointment_date
+        )
+            ->where(
+                'appointment_time',
+                $request->appointment_time
+            )
+            ->where('id', '!=', $id)
+            ->first();
+
+        if ($alreadyAppointment) {
+
+            return response()->json([
+                'status'  => false,
+                'message' => 'Appointment Time Already Booked',
+            ], 422);
+        }
+
+        $appointment->update([
+
+            'appointment_type' => $request->appointment_type,
+            'appointment_date' => $request->appointment_date,
+            'appointment_time' => $request->appointment_time,
+            'fee_amount'       => $request->fee_amount,
+            'payment_method'   => $request->payment_method,
+            'remarks'          => $request->remarks,
+
+        ]);
+
+        return response()->json([
+
+            'status'  => true,
+            'message' => 'Appointment Updated Successfully',
+            'data'    => $appointment->fresh(),
+
+        ]);
+    }
+
+    /**
+     * Delete Appointment
+     */
+
+    public function deleteAppointment($id)
+    {
+        $appointment = Appointment::find($id);
+
+        if (! $appointment) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Appointment not found',
+            ], 404);
+        }
+
+        $appointment->delete();
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Appointment deleted successfully',
+        ]);
+    }
+
     public function fetchClient(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -407,6 +508,7 @@ class AppointmentController extends Controller
 
     public function appointmentList(Request $request)
     {
+
         $query = Appointment::with('addedBy');
 
         /*
@@ -780,6 +882,7 @@ class AppointmentController extends Controller
             return [
 
                 'id'               => $item->id,
+                'client_id'        => $item->client_id,
 
                 'time'             => date(
                     'H:i',

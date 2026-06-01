@@ -11,13 +11,15 @@ class FollowupController extends Controller
     {
         $validator = Validator::make($request->all(), [
 
-            'client_id'      => 'required|exists:clients,id',
+            'client_id'     => 'required|exists:clients,id',
 
-            'appointment_id' => 'nullable|exists:appointments,id',
+            // 'appointment_id' => 'nullable|exists:appointments,id',
 
-            'followup_date'  => 'required|date',
+            'followup_date' => 'required|date',
+            'followup_time' => 'required|string',
+            'followp_type'  => 'required|string',
 
-            'remarks'        => 'required|string',
+            'remarks'       => 'required|string',
 
         ]);
 
@@ -27,7 +29,7 @@ class FollowupController extends Controller
 
                 'status'  => false,
 
-                'message' => $validator->errors()->first(),
+                'message' => $validator->errors(),
 
             ], 422);
         }
@@ -40,17 +42,19 @@ class FollowupController extends Controller
 
         $followup = Followup::create([
 
-            'client_id'      => $request->client_id,
+            'client_id'     => $request->client_id,
 
-            'appointment_id' => $request->appointment_id,
+            // 'appointment_id' => $request->appointment_id,
 
-            'followup_date'  => $request->followup_date,
+            'followup_date' => $request->followup_date,
+            'followp_time'  => $request->followup_time,
+            'followp_type'  => $request->followp_type,
 
-            'remarks'        => $request->remarks,
+            'remarks'       => $request->remarks,
 
-            'status'         => 0,
+            'status'        => 0,
 
-            'added_by'       => auth()->id(),
+            'added_by'      => auth()->id(),
 
         ]);
 
@@ -348,6 +352,90 @@ class FollowupController extends Controller
 
             }),
 
+        ]);
+    }
+
+    /**
+     *  All Followups Mobile
+     */
+
+    public function allFollowUps(Request $request)
+    {
+        $query = Followup::query();
+
+        if ($request->filled('client_id')) {
+            $query->where('client_id', $request->client_id);
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $followups = $query
+            ->orderBy('followup_date', 'desc')
+            ->get();
+
+        $data = $followups->map(function ($item) {
+            return [
+                'id'             => $item->id,
+                'client_id'      => $item->client_id,
+                'appointment_id' => $item->appointment_id,
+                'followup_date'  => $item->followup_date,
+                'followup_time'  => $item->followup_time,
+                'followp_type'   => $item->followp_type,
+                'remarks'        => $item->remarks,
+                'status'         => $item->status,
+                'created_at'     => $item->created_at,
+            ];
+        });
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Followups fetched successfully',
+            'count'   => $data->count(),
+            'data'    => $data,
+        ]);
+    }
+
+/**
+ * Update Followup
+ */
+
+    public function updateFollowup(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'followup_date' => 'required|date',
+            'followp_type'  => 'required|string',
+            'remarks'       => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => false,
+                'message' => $validator->errors(),
+            ], 422);
+        }
+
+        $followup = Followup::find($id);
+
+        if (! $followup) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Followup not found',
+            ], 404);
+        }
+
+        $followup->update([
+            'followup_date' => $request->followup_date,
+            'followp_type'  => $request->followp_type,
+            'remarks'       => $request->remarks,
+            'status'        => $request->status ?? $followup->status,
+        ]);
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Followup updated successfully',
+            'data'    => $followup->fresh(),
         ]);
     }
 }
