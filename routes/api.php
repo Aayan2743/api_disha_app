@@ -86,6 +86,14 @@ Route::group([
         [AttendanceController::class, 'todaySession']
     );
 
+    Route::get(
+        '/dashboard',
+        [AttendanceController::class, 'attendanceDashboard']
+
+    );
+
+    Route::post('/punch', [AttendanceController::class, 'punch']);
+
 });
 
 // client
@@ -107,6 +115,11 @@ Route::group([
     Route::get(
         '/all-clients',
         [ClientController::class, 'allClients']
+    );
+
+    Route::get(
+        '/my-clients',
+        [ClientController::class, 'myClients']
     );
 
 });
@@ -173,6 +186,11 @@ Route::group([
         [DashboardController::class, 'adminDashboard']
     );
 
+    Route::get(
+        '/telecaller-dashboard',
+        [DashboardController::class, 'telecallerDashboard']
+    );
+
 });
 
 // followup
@@ -199,6 +217,11 @@ Route::group([
     Route::post(
         '/update-followup/{id}',
         [FollowupController::class, 'updateFollowup']
+    );
+
+    Route::post(
+        '/delete-followup/{id}',
+        [FollowupController::class, 'deleteFollowup']
     );
 
 });

@@ -3,6 +3,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Appointment;
 use App\Models\Client;
+use App\Models\Followup;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -527,6 +528,129 @@ class DashboardController extends Controller
 
                     'pending_count' => $todayFollowups,
                 ],
+            ],
+        ]);
+    }
+
+    /**
+     * Telecaller Dashboard
+     */
+
+    public function telecallerDashboard(Request $request)
+    {
+        $userId = auth()->id();
+
+        $filter = $request->filter ?? 'today';
+
+        /*
+    |--------------------------------------------------------------------------
+    | DATE RANGE
+    |--------------------------------------------------------------------------
+    */
+
+        switch ($filter) {
+
+            case 'today':
+                $fromDate = today()->toDateString();
+                $toDate   = today()->toDateString();
+                break;
+
+            case 'week':
+                $fromDate = now()->startOfWeek()->toDateString();
+                $toDate   = now()->endOfWeek()->toDateString();
+                break;
+
+            case 'month':
+                $fromDate = now()->startOfMonth()->toDateString();
+                $toDate   = now()->endOfMonth()->toDateString();
+                break;
+
+            case 'custom':
+                if (! $request->filled('date')) {
+                    return response()->json([
+                        'status'  => false,
+                        'message' => 'Date is required',
+                    ], 422);
+                }
+
+                $fromDate = $request->date;
+                $toDate   = $request->date;
+                break;
+
+            default:
+                $fromDate = today()->toDateString();
+                $toDate   = today()->toDateString();
+                break;
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | SUMMARY COUNTS
+    |--------------------------------------------------------------------------
+    */
+
+        $totalCalls = Client::where('added_by', $userId)
+            ->whereDate('created_at', '>=', $fromDate)
+            ->whereDate('created_at', '<=', $toDate)
+            ->count();
+
+        $totalClients = Client::where('added_by', $userId)
+            ->whereDate('created_at', '>=', $fromDate)
+            ->whereDate('created_at', '<=', $toDate)
+            ->count();
+
+        $appointments = Appointment::where('added_by', $userId)
+            ->whereDate('appointment_date', '>=', $fromDate)
+            ->whereDate('appointment_date', '<=', $toDate)
+            ->count();
+
+        $followups = Followup::where('added_by', $userId)
+            ->where('status', 0)
+            ->whereDate('followup_date', '>=', $fromDate)
+            ->whereDate('followup_date', '<=', $toDate)
+            ->count();
+
+        /*
+    |--------------------------------------------------------------------------
+    | APPOINTMENTS LIST
+    |--------------------------------------------------------------------------
+    */
+
+        $appointmentsList = Appointment::leftJoin(
+            'clients',
+            'appointments.client_id',
+            '=',
+            'clients.id'
+        )
+            ->where('appointments.added_by', $userId)
+            ->whereDate('appointments.appointment_date', '>=', $fromDate)
+            ->whereDate('appointments.appointment_date', '<=', $toDate)
+            ->orderBy('appointments.appointment_date')
+            ->orderBy('appointments.appointment_time')
+            ->take(5)
+            ->select(
+                'appointments.id',
+                'clients.fullname as client_name',
+                'appointments.appointment_date',
+                'appointments.appointment_time',
+                'appointments.appointment_type',
+                'appointments.remarks'
+            )
+            ->get();
+
+        return response()->json([
+            'status' => true,
+            'data'   => [
+                'filter'             => $filter,
+
+                'summary'            => [
+                    'total_calls'   => $totalCalls,
+                    'total_clients' => $totalClients,
+                    'appointments'  => $appointments,
+                    'followups'     => $followups,
+                ],
+
+                'today_appointments' => $appointmentsList,
             ],
         ]);
     }

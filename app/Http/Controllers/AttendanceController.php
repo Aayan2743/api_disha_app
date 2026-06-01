@@ -832,4 +832,113 @@ class AttendanceController extends Controller
             'data'    => $data,
         ]);
     }
+
+    /**
+     * Summary of attendanceDashboard
+     *
+     */
+    public function attendanceDashboard()
+    {
+        $userId = auth()->id();
+        $today  = now()->toDateString();
+
+        $todayAttendance = Attendance::where('user_id', $userId)
+            ->whereDate('attendance_date', $today)
+            ->first();
+
+        $records = Attendance::where('user_id', $userId)
+            ->orderByDesc('attendance_date')
+            ->get()
+            ->map(function ($item) {
+
+                $status = $item->punch_in ? 'present' : 'absent';
+
+                return [
+                    'date'     => $item->attendance_date,
+
+                    'punchIn'  => $item->punch_in
+                        ? Carbon::parse($item->punch_in)->format('h:i A')
+                        : null,
+
+                    'punchOut' => $item->punch_out
+                        ? Carbon::parse($item->punch_out)->format('h:i A')
+                        : null,
+
+                    'status'   => $status,
+                ];
+            });
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Attendance fetched successfully',
+            'data'    => [
+                'currentStatus'  =>
+                ($todayAttendance && ! $todayAttendance->punch_out)
+                    ? 'present'
+                    : null,
+
+                'currentPunchIn' =>
+                $todayAttendance?->punch_in
+                    ? Carbon::parse(
+                    $todayAttendance->punch_in
+                )->format('h:i A')
+                    : null,
+
+                'records'        => $records,
+            ],
+        ]);
+    }
+
+    public function punch()
+    {
+        $userId = auth()->id();
+        $today  = now()->toDateString();
+
+        $attendance = Attendance::where('user_id', $userId)
+            ->whereDate('attendance_date', $today)
+            ->first();
+
+        // Punch In
+        if (! $attendance) {
+
+            $attendance = Attendance::create([
+                'user_id'         => $userId,
+                'attendance_date' => $today,
+                'punch_in'        => now(),
+            ]);
+
+            return response()->json([
+                'status'  => true,
+                'action'  => 'punch_in',
+                'message' => 'Punch In successful',
+                'data'    => [
+                    'punch_in' => now()->format('h:i A'),
+                ],
+            ]);
+        }
+
+        // Already punched out
+        if ($attendance->punch_out) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Attendance already completed for today',
+            ]);
+        }
+
+        // Punch Out
+        $attendance->update([
+            'punch_out'     => now(),
+            'total_minutes' => Carbon::parse($attendance->punch_in)
+                ->diffInMinutes(now()),
+        ]);
+
+        return response()->json([
+            'status'  => true,
+            'action'  => 'punch_out',
+            'message' => 'Punch Out successful',
+            'data'    => [
+                'punch_out' => now()->format('h:i A'),
+            ],
+        ]);
+    }
 }

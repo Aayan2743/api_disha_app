@@ -372,16 +372,20 @@ class FollowupController extends Controller
         }
 
         $followups = $query
+            ->with('client')
             ->orderBy('followup_date', 'desc')
             ->get();
 
         $data = $followups->map(function ($item) {
             return [
                 'id'             => $item->id,
+
                 'client_id'      => $item->client_id,
+                'client_name'    => $item->client->fullname ?? '',
+                'phone'          => $item->client->phone ?? '',
                 'appointment_id' => $item->appointment_id,
                 'followup_date'  => $item->followup_date,
-                'followup_time'  => $item->followup_time,
+                'followup_time'  => $item->followp_time,
                 'followp_type'   => $item->followp_type,
                 'remarks'        => $item->remarks,
                 'status'         => $item->status,
@@ -406,7 +410,9 @@ class FollowupController extends Controller
         $validator = Validator::make($request->all(), [
             'followup_date' => 'required|date',
             'followp_type'  => 'required|string',
+            'followup_time' => 'required|string',
             'remarks'       => 'required|string',
+            'status'        => 'nullable|integer',
         ]);
 
         if ($validator->fails()) {
@@ -428,6 +434,7 @@ class FollowupController extends Controller
         $followup->update([
             'followup_date' => $request->followup_date,
             'followp_type'  => $request->followp_type,
+            'followp_time'  => $request->followup_time,
             'remarks'       => $request->remarks,
             'status'        => $request->status ?? $followup->status,
         ]);
@@ -436,6 +443,25 @@ class FollowupController extends Controller
             'status'  => true,
             'message' => 'Followup updated successfully',
             'data'    => $followup->fresh(),
+        ]);
+    }
+
+    public function deleteFollowup($id)
+    {
+        $followup = Followup::find($id);
+
+        if (! $followup) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Followup not found',
+            ], 404);
+        }
+
+        $followup->delete();
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Followup deleted successfully',
         ]);
     }
 }
